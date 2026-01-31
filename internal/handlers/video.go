@@ -58,6 +58,8 @@ func handleServiceError(w http.ResponseWriter, err error, operation string) bool
 		writeError(w, http.StatusConflict, "conflict", "video with this shortcode already exists")
 	case errors.Is(err, storage.ErrDirectoryNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "video not found")
+	case errors.Is(err, service.ErrReelDoesNotExistOrYtdlpBroken):
+		writeError(w, http.StatusNotFound, "not_found", "video not found or yt-dlp error")
 	default:
 		log.Printf("Error %s: %v", operation, err)
 		writeError(w, http.StatusInternalServerError, "internal_error", "internal server error")
