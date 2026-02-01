@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 )
 
 var (
@@ -14,8 +13,6 @@ var (
 	ErrVideoNotFound     = errors.New("video file not found")
 	ErrInvalidShortcode  = errors.New("invalid shortcode format")
 )
-
-var shortcodeRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 type FileSystem struct {
 	contentDir string
@@ -36,9 +33,6 @@ func (fs *FileSystem) ValidateShortcode(shortcode string) error {
 		return ErrInvalidShortcode
 	}
 	if len(shortcode) > 100 {
-		return ErrInvalidShortcode
-	}
-	if !shortcodeRegex.MatchString(shortcode) {
 		return ErrInvalidShortcode
 	}
 	return nil

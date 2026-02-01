@@ -73,7 +73,14 @@ func NewVideoService(storage *storage.FileSystem, downloader VideoDownloader) *V
 	}
 }
 
-func (s *VideoService) CreateVideo(shortcode string) error {
+func (s *VideoService) validateShortcode(shortcode string) error {
+	if err := s.storage.ValidateShortcode(shortcode); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+	return nil
+}
+
+func (s *VideoService) CreateReel(shortcode string) error {
 	exists, err := s.CheckExists(shortcode)
 	if err != nil {
 		return fmt.Errorf("failed to check existence: %w", err)
@@ -97,30 +104,41 @@ func (s *VideoService) CreateVideo(shortcode string) error {
 }
 
 func (s *VideoService) CheckExists(shortcode string) (bool, error) {
-	if err := s.storage.ValidateShortcode(shortcode); err != nil {
-		return false, fmt.Errorf("validation failed: %w", err)
+	if err := s.validateShortcode(shortcode); err != nil {
+		return false, err
 	}
-
 	return s.storage.DirectoryExists(shortcode), nil
 }
 
 func (s *VideoService) GetVideoPath(shortcode string) (string, error) {
-	if err := s.storage.ValidateShortcode(shortcode); err != nil {
-		return "", fmt.Errorf("validation failed: %w", err)
+	if err := s.validateShortcode(shortcode); err != nil {
+		return "", err
 	}
-
 	return s.storage.GetVideoPath(shortcode)
 }
 
-func (s *VideoService) DeleteVideo(shortcode string) error {
-	if err := s.storage.ValidateShortcode(shortcode); err != nil {
-		return fmt.Errorf("validation failed: %w", err)
+func (s *VideoService) GetDescriptionPath(shortcode string) (string, error) {
+	if err := s.validateShortcode(shortcode); err != nil {
+		return "", err
 	}
+	return s.storage.GetDescriptionPath(shortcode)
+}
 
+func (s *VideoService) GetReelDescription(reelPath string) string {
+	descriptionBytes, err := os.ReadFile(reelPath)
+	if err != nil {
+		return ""
+	}
+	return string(descriptionBytes)
+}
+
+func (s *VideoService) DeleteReel(shortcode string) error {
+	if err := s.validateShortcode(shortcode); err != nil {
+		return err
+	}
 	if err := s.storage.DeleteDirectory(shortcode); err != nil {
 		return err
 	}
-
 	log.Printf("Successfully deleted video entry for shortcode: %s", shortcode)
 	return nil
 }

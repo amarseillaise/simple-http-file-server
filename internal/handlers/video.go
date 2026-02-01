@@ -67,16 +67,23 @@ func handleServiceError(w http.ResponseWriter, err error, operation string) bool
 	return true
 }
 
-func (h *VideoHandler) CreateVideo(w http.ResponseWriter, r *http.Request) {
+func extractShortcode(w http.ResponseWriter, r *http.Request, operation string) (string, bool) {
 	shortcode := mux.Vars(r)["shortcode"]
 	if shortcode == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "shortcode is required")
+		return "", false
+	}
+	log.Printf("%s request for shortcode: %s", operation, shortcode)
+	return shortcode, true
+}
+
+func (h *VideoHandler) CreateReel(w http.ResponseWriter, r *http.Request) {
+	shortcode, ok := extractShortcode(w, r, "CreateReel")
+	if !ok {
 		return
 	}
 
-	log.Printf("CreateVideo request for shortcode: %s", shortcode)
-
-	if handleServiceError(w, h.service.CreateVideo(shortcode), "creating video") {
+	if handleServiceError(w, h.service.CreateReel(shortcode), "creating video") {
 		return
 	}
 
@@ -86,15 +93,11 @@ func (h *VideoHandler) CreateVideo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *VideoHandler) GetVideo(w http.ResponseWriter, r *http.Request) {
-	shortcode := mux.Vars(r)["shortcode"]
-	if shortcode == "" {
-		writeError(w, http.StatusBadRequest, "bad_request", "shortcode is required")
+func (h *VideoHandler) GetReelVideo(w http.ResponseWriter, r *http.Request) {
+	shortcode, ok := extractShortcode(w, r, "GetReelVideo")
+	if !ok {
 		return
 	}
-
-	log.Printf("GetVideo request for shortcode: %s", shortcode)
-
 	videoPath, err := h.service.GetVideoPath(shortcode)
 	if handleServiceError(w, err, "getting video path") {
 		return
@@ -105,16 +108,31 @@ func (h *VideoHandler) GetVideo(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, videoPath)
 }
 
-func (h *VideoHandler) DeleteVideo(w http.ResponseWriter, r *http.Request) {
-	shortcode := mux.Vars(r)["shortcode"]
-	if shortcode == "" {
-		writeError(w, http.StatusBadRequest, "bad_request", "shortcode is required")
+func (h *VideoHandler) GetReelDescription(w http.ResponseWriter, r *http.Request) {
+	shortcode, ok := extractShortcode(w, r, "GetReelDescription")
+	if !ok {
 		return
 	}
+	var description string
+	descriptionPath, err := h.service.GetDescriptionPath(shortcode)
+	if err != nil {
+		description = ""
+	} else {
+		description = h.service.GetReelDescription(descriptionPath)
+	}
 
-	log.Printf("DeleteVideo request for shortcode: %s", shortcode)
+	writeJSON(w, http.StatusOK, SuccessResponse{
+		Success: true,
+		Message: description,
+	})
+}
 
-	if handleServiceError(w, h.service.DeleteVideo(shortcode), "deleting video") {
+func (h *VideoHandler) DeleteReel(w http.ResponseWriter, r *http.Request) {
+	shortcode, ok := extractShortcode(w, r, "DeleteReel")
+	if !ok {
+		return
+	}
+	if handleServiceError(w, h.service.DeleteReel(shortcode), "deleting video") {
 		return
 	}
 
@@ -125,7 +143,8 @@ func (h *VideoHandler) DeleteVideo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *VideoHandler) RegisterRoutes(router *mux.Router) {
-	router.HandleFunc("/api/video/{shortcode}", h.CreateVideo).Methods(http.MethodPost)
-	router.HandleFunc("/api/video/{shortcode}", h.DeleteVideo).Methods(http.MethodDelete)
-	router.HandleFunc("/api/video/{shortcode}", h.GetVideo).Methods(http.MethodGet)
+	router.HandleFunc("/api/reel/{shortcode}", h.CreateReel).Methods(http.MethodPost)
+	router.HandleFunc("/api/reel/{shortcode}", h.DeleteReel).Methods(http.MethodDelete)
+	router.HandleFunc("/api/reel/{shortcode}/video", h.GetReelVideo).Methods(http.MethodGet)
+	router.HandleFunc("/api/reel/{shortcode}/description", h.GetReelDescription).Methods(http.MethodGet)
 }
