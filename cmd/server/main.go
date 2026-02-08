@@ -20,7 +20,12 @@ import (
 func main() {
 	cfg := config.Load()
 
-	log.Printf("Starting server with config: port=%d, contentDir=%s", cfg.ServerPort, cfg.ContentDir)
+	msg := "Starting server with config: port=%d, contentDir=%s"
+	if cfg.TLSEnabled() {
+		log.Printf(msg, cfg.ServerPort, cfg.ContentDir)
+	} else {
+		log.Printf(msg, cfg.ServerPort, cfg.ContentDir)
+	}
 
 	fs, err := storage.NewFileSystem(cfg.ContentDir)
 	if err != nil {
@@ -50,9 +55,16 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Server listening on port %d", cfg.ServerPort)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed: %v", err)
+		if cfg.TLSEnabled() {
+			log.Printf("Server listening on port %d (HTTPS)", cfg.ServerPort)
+			if err := server.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("Server failed: %v", err)
+			}
+		} else {
+			log.Printf("Server listening on port %d (HTTP)", cfg.ServerPort)
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("Server failed: %v", err)
+			}
 		}
 	}()
 

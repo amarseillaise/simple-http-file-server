@@ -5,12 +5,16 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
+      - "8443:8443"
     environment:
       - SERVER_PORT=8080
       - CONTENT_DIR=/app/content
+      - TLS_CERT_FILE=/app/certs/fullchain.pem
+      - TLS_KEY_FILE=/app/certs/privkey.pem
     volumes:
       - ./content:/app/content
       - ./cookies.txt:/app/cookies.txt
+      - ./certs:/app/certs:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]

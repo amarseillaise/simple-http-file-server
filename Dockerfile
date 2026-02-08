@@ -27,8 +27,9 @@ COPY --from=builder /app/server .
 RUN mkdir -p /app/content
 
 EXPOSE 8080
+EXPOSE 8443
 
-ENV SERVER_PORT=8080
+ENV SERVER_PORT=8443
 ENV CONTENT_DIR=/app/content
 
-CMD ["./server"]
+CMD ["SERVER_PORT=8443", "TLS_CERT_FILE=/app/certs/fullchain.pem", "TLS_KEY_FILE=/app/certs/privkey.pem", "./server"]
