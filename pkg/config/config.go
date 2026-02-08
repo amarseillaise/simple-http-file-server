@@ -1,8 +1,11 @@
 package config
 
 import (
+	"log"
 	"os"
 	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -13,11 +16,15 @@ type Config struct {
 }
 
 func Load() *Config {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error: .env file not found")
+	}
+
 	return &Config{
-		ServerPort:  getEnvAsInt("SERVER_PORT", 8080),
-		ContentDir:  getEnv("CONTENT_DIR", "./content"),
-		TLSCertFile: getEnv("TLS_CERT_FILE", ""),
-		TLSKeyFile:  getEnv("TLS_KEY_FILE", ""),
+		ServerPort:  getEnvAsInt("SERVER_PORT"),
+		ContentDir:  os.Getenv("CONTENT_DIR"),
+		TLSCertFile: os.Getenv("TLS_CERT_FILE"),
+		TLSKeyFile:  os.Getenv("TLS_KEY_FILE"),
 	}
 }
 
@@ -33,14 +40,11 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func getEnvAsInt(key string, defaultValue int) int {
-	valueStr := getEnv(key, "")
-	if valueStr == "" {
-		return defaultValue
-	}
+func getEnvAsInt(key string) int {
+	valueStr := os.Getenv(key)
 	value, err := strconv.Atoi(valueStr)
 	if err != nil {
-		return defaultValue
+		return 8443 // default port
 	}
 	return value
 }
