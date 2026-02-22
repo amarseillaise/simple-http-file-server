@@ -1,17 +1,15 @@
+# ── Stage 1: Build Go binary ──────────────────────────────────────────
 FROM golang:1.21-alpine AS builder
-
-RUN apk add --no-cache bash
 
 WORKDIR /app
 
 COPY go.mod go.sum ./
-COPY build.sh ./
-RUN chmod +x build.sh
+RUN go mod download
 
 COPY . .
+RUN go build -o server cmd/server/main.go
 
-RUN ./build.sh
-
+# ── Stage 2: Runtime ──────────────────────────────────────────────────
 FROM alpine:latest
 
 RUN apk add --no-cache \
@@ -26,8 +24,8 @@ COPY --from=builder /app/server .
 
 RUN mkdir -p /app/content
 
+# Only the internal application port (Nginx proxies 443 → this port)
 EXPOSE 8080
-EXPOSE 8443
 
 ENV CONTENT_DIR=/app/content
 

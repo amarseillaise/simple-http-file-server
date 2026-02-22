@@ -35,3 +35,6 @@ content/
 
 cookies.txt
 
+# Generated / runtime files
+certbot/
+nginx/nginx.conf

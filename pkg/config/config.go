@@ -44,7 +44,7 @@ func getEnvAsInt(key string) int {
 	valueStr := os.Getenv(key)
 	value, err := strconv.Atoi(valueStr)
 	if err != nil {
-		return 8443 // default port
+		return 8080 // default port
 	}
 	return value
 }
