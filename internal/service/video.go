@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,8 +12,6 @@ import (
 )
 
 const ytdlp = "yt-dlp"
-
-var ErrReelDoesNotExistOrYtdlpBroken = errors.New("reel doesn't exist or yt-dlp error")
 
 type VideoService struct {
 	storage    *storage.FileSystem
@@ -96,7 +93,7 @@ func (s *VideoService) CreateReel(shortcode string) error {
 	err = s.downloader.Download(shortcode)
 	if err != nil {
 		s.storage.DeleteDirectory(shortcode)
-		return ErrReelDoesNotExistOrYtdlpBroken
+		return err
 	}
 
 	log.Printf("Successfully created video entry for shortcode: %s", shortcode)

@@ -21,60 +21,9 @@ func NewVideoHandler(service *service.VideoService) *VideoHandler {
 	}
 }
 
-type ErrorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message,omitempty"`
-}
-
-type SuccessResponse struct {
+type ApiResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
-}
-
-func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Printf("Error encoding JSON response: %v", err)
-	}
-}
-
-func writeError(w http.ResponseWriter, statusCode int, errType string, message string) {
-	writeJSON(w, statusCode, ErrorResponse{
-		Error:   errType,
-		Message: message,
-	})
-}
-
-func handleServiceError(w http.ResponseWriter, err error, operation string) bool {
-	if err == nil {
-		return false
-	}
-
-	switch {
-	case errors.Is(err, storage.ErrInvalidShortcode):
-		writeError(w, http.StatusBadRequest, "bad_request", "invalid shortcode format")
-	case errors.Is(err, storage.ErrDirectoryExists):
-		writeError(w, http.StatusConflict, "conflict", "video with this shortcode already exists")
-	case errors.Is(err, storage.ErrDirectoryNotFound):
-		writeError(w, http.StatusNotFound, "not_found", "video not found")
-	case errors.Is(err, service.ErrReelDoesNotExistOrYtdlpBroken):
-		writeError(w, http.StatusNotFound, "not_found", "video not found or yt-dlp error")
-	default:
-		log.Printf("Error %s: %v", operation, err)
-		writeError(w, http.StatusInternalServerError, "internal_error", "internal server error")
-	}
-	return true
-}
-
-func extractShortcode(w http.ResponseWriter, r *http.Request, operation string) (string, bool) {
-	shortcode := mux.Vars(r)["shortcode"]
-	if shortcode == "" {
-		writeError(w, http.StatusBadRequest, "bad_request", "shortcode is required")
-		return "", false
-	}
-	log.Printf("%s request for shortcode: %s", operation, shortcode)
-	return shortcode, true
 }
 
 func (h *VideoHandler) CreateReel(w http.ResponseWriter, r *http.Request) {
@@ -83,14 +32,25 @@ func (h *VideoHandler) CreateReel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if handleServiceError(w, h.service.CreateReel(shortcode), "creating video") {
-		return
+	err := h.service.CreateReel(shortcode)
+	var response ApiResponse
+	var statusCode int
+	switch {
+	case err == nil:
+		statusCode = http.StatusCreated
+		response.Success = true
+		response.Message = "video created successfully"
+	case errors.Is(err, storage.ErrDirectoryExists):
+		statusCode = http.StatusAccepted
+		response.Success = true
+		response.Message = "video with this shortcode already exists"
+	default:
+		statusCode = http.StatusBadRequest
+		response.Success = false
+		response.Message = "reel doesn't exist or yt-dlp error"
 	}
 
-	writeJSON(w, http.StatusCreated, SuccessResponse{
-		Success: true,
-		Message: "video created successfully",
-	})
+	writeJSON(w, statusCode, response)
 }
 
 func (h *VideoHandler) GetReelVideo(w http.ResponseWriter, r *http.Request) {
@@ -99,13 +59,32 @@ func (h *VideoHandler) GetReelVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	videoPath, err := h.service.GetVideoPath(shortcode)
-	if handleServiceError(w, err, "getting video path") {
+	var response ApiResponse
+	var statusCode int
+	switch {
+	case err == nil:
+		w.Header().Set("Content-Type", "video/mp4")
+		w.Header().Set("Content-Disposition", "inline; filename=\"video.mp4\"")
+		http.ServeFile(w, r, videoPath)
 		return
+	case errors.Is(err, storage.ErrInvalidShortcode):
+		statusCode = http.StatusBadRequest
+		response.Success = false
+		response.Message = "invalid shortcode format"
+	case errors.Is(err, storage.ErrDirectoryNotFound):
+		statusCode = http.StatusNotFound
+		response.Success = false
+		response.Message = "directory not found"
+	case errors.Is(err, storage.ErrVideoNotFound):
+		statusCode = http.StatusNotFound
+		response.Success = false
+		response.Message = "video not found"
+	default:
+		statusCode = http.StatusInternalServerError
+		response.Success = false
+		response.Message = "Unexpected error occurred while retrieving video"
 	}
-
-	w.Header().Set("Content-Type", "video/mp4")
-	w.Header().Set("Content-Disposition", "inline; filename=\"video.mp4\"")
-	http.ServeFile(w, r, videoPath)
+	writeJSON(w, statusCode, response)
 }
 
 func (h *VideoHandler) GetReelDescription(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +100,7 @@ func (h *VideoHandler) GetReelDescription(w http.ResponseWriter, r *http.Request
 		description = h.service.GetReelDescription(descriptionPath)
 	}
 
-	writeJSON(w, http.StatusOK, SuccessResponse{
+	writeJSON(w, http.StatusOK, ApiResponse{
 		Success: true,
 		Message: description,
 	})
@@ -132,14 +111,49 @@ func (h *VideoHandler) DeleteReel(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if handleServiceError(w, h.service.DeleteReel(shortcode), "deleting video") {
-		return
+	err := h.service.DeleteReel(shortcode)
+	var response ApiResponse
+	var statusCode int
+	switch {
+	case err == nil:
+		statusCode = http.StatusOK
+		response.Success = true
+		response.Message = "video deleted successfully"
+	case errors.Is(err, storage.ErrInvalidShortcode):
+		statusCode = http.StatusBadRequest
+		response.Success = false
+		response.Message = "invalid shortcode format"
+	case errors.Is(err, storage.ErrDirectoryNotFound):
+		statusCode = http.StatusNotFound
+		response.Success = false
+		response.Message = "directory not found"
+	default:
+		statusCode = http.StatusInternalServerError
+		response.Success = false
+		response.Message = "Unexpected error occurred while retrieving video"
 	}
+	writeJSON(w, statusCode, response)
+}
 
-	writeJSON(w, http.StatusOK, SuccessResponse{
-		Success: true,
-		Message: "video deleted successfully",
-	})
+func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("Error encoding JSON response: %v", err)
+	}
+}
+
+func extractShortcode(w http.ResponseWriter, r *http.Request, operation string) (string, bool) {
+	shortcode := mux.Vars(r)["shortcode"]
+	if shortcode == "" {
+		writeJSON(w, http.StatusBadRequest, ApiResponse{
+			Success: false,
+			Message: "shortcode is required",
+		})
+		return "", false
+	}
+	log.Printf("%s request for shortcode: %s", operation, shortcode)
+	return shortcode, true
 }
 
 func (h *VideoHandler) RegisterRoutes(router *mux.Router) {
