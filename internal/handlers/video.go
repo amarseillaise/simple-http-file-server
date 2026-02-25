@@ -159,6 +159,6 @@ func extractShortcode(w http.ResponseWriter, r *http.Request, operation string) 
 func (h *VideoHandler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/api/reel/{shortcode}", h.CreateReel).Methods(http.MethodPost)
 	router.HandleFunc("/api/reel/{shortcode}", h.DeleteReel).Methods(http.MethodDelete)
-	router.HandleFunc("/api/reel/{shortcode}/video", h.GetReelVideo).Methods(http.MethodGet)
+	router.HandleFunc("/api/reel/{shortcode}/video.mp4", h.GetReelVideo).Methods(http.MethodGet)
 	router.HandleFunc("/api/reel/{shortcode}/description", h.GetReelDescription).Methods(http.MethodGet)
 }
